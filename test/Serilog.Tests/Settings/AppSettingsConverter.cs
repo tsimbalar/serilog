@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Serilog.Configuration;
 using Serilog.Events;
 
 namespace Serilog.Tests.Settings
 {
-    
+
 
     public static class AppSettingsConverter
     {
@@ -25,51 +26,54 @@ namespace Serilog.Tests.Settings
             {
                 var methodCall = (MethodCallExpression)current;
                 var leftSide = (MemberExpression)((MethodCallExpression)current).Object;
-                if (leftSide.Member.DeclaringType == typeof(LoggerConfiguration))
+                current = leftSide.Expression;
+
+                if (leftSide.Member.DeclaringType != typeof(LoggerConfiguration)) continue;
+
+                switch (leftSide.Member.Name)
                 {
-                    if (leftSide.Member.Name == nameof(LoggerConfiguration.MinimumLevel))
-                    {
+                    case nameof(LoggerConfiguration.MinimumLevel):
                         if (Enum.TryParse(methodCall.Method.Name, out LogEventLevel minimumLevel))
                         {
                             yield return new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString());
+                            continue;
                         }
-                    }
+                        throw new NotImplementedException($"Not supported : MinimumLevel.{methodCall.Method.Name}");
+                    case nameof(LoggerConfiguration.Enrich):
+                        if (methodCall.Method.Name != nameof(LoggerEnrichmentConfiguration.WithProperty))
+                            throw new NotImplementedException($"Not supported : Enrich.{methodCall.Method.Name}");
+                        var enrichPropertyName = ((ConstantExpression)methodCall.Arguments[0]).Value.ToString();
+                        var enrichWithArgument = methodCall.Arguments[1];
+                        var enrichmentValue = ExtractStringValue(enrichWithArgument);
+                        yield return new KeyValuePair<string, string>($"enrich:with-property:{enrichPropertyName}", enrichmentValue);
+                        continue;
+                    default:
+                        throw new NotSupportedException($"Not supported : LoggerConfiguration.{leftSide.Member.Name}");
                 }
-
-                current = leftSide.Expression;
             }
-
-            //var instanceMethodCall = (MethodCallExpression)exp.Body;
-            //var objectExpression = (MemberExpression)instanceMethodCall.Object;
-
-
-
-            //if (objectExpression.Member.DeclaringType == typeof(LoggerConfiguration) && objectExpression.Member.Name == nameof(LoggerConfiguration.MinimumLevel))
-            //{
-            //    LogEventLevel minimumLevel;
-            //    if (Enum.TryParse(instanceMethodCall.Method.Name, out minimumLevel))
-            //    {
-            //        yield return new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString());
-            //    }
-
-            //}
-
-            //if (objectExpression.Expression is MethodCallExpression)
-            //{
-            //    instanceMethodCall = (MethodCallExpression) objectExpression.Expression;
-            //    objectExpression = (MemberExpression) instanceMethodCall.Object;
-
-            //    if (objectExpression.Member.DeclaringType == typeof(LoggerConfiguration) && objectExpression.Member.Name == nameof(LoggerConfiguration.MinimumLevel))
-            //    {
-            //        LogEventLevel minimumLevel;
-            //        if (Enum.TryParse(instanceMethodCall.Method.Name, out minimumLevel))
-            //        {
-            //            yield return new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString());
-            //        }
-
-            //    }
-            //}
         }
 
+        static string ExtractStringValue(Expression exp)
+        {
+            if (exp == null) throw new ArgumentNullException(nameof(exp));
+            switch (exp)
+            {
+                case ConstantExpression constantExp:
+                    return $"{constantExp.Value}";
+
+                case UnaryExpression unaryExp:
+                    return $"{unaryExp.Operand}";
+
+                case NewExpression newExp:
+                    if (newExp.Type == typeof(Uri))
+                    {
+                        return ((ConstantExpression)newExp.Arguments[0]).Value.ToString();
+                    }
+                    throw new NotImplementedException($"Not supported : new {newExp.Type}(...)");
+
+                default:
+                    throw new NotImplementedException($"Cannot extract a string value from `{exp}`");
+            }
+        }
     }
 }
