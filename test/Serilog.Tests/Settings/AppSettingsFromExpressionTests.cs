@@ -59,7 +59,7 @@ namespace Serilog.Tests.Settings
         }
 
         [Fact]
-        public void SupportSink()
+        public void SupportWriteTo()
         {
             var actual = AppSettingsConverter.From(lc =>
                     lc
@@ -75,6 +75,29 @@ namespace Serilog.Tests.Settings
                 new KeyValuePair<string, string>("using:TestDummies", typeof(DummyLoggerConfigurationExtensions).GetTypeInfo().Assembly.FullName),
                 new KeyValuePair<string, string>("write-to:DummyRollingFile.pathFormat", @"C:\toto.log"),
                 new KeyValuePair<string, string>("write-to:DummyRollingFile.restrictedToMinimumLevel", "Warning")
+            };
+
+            Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
+        }
+
+
+        [Fact]
+        public void SupportAuditTo()
+        {
+            var actual = AppSettingsConverter.From(lc =>
+                lc
+                    .AuditTo.DummyRollingFile(
+                        @"C:\toto.log",
+                        LogEventLevel.Warning,
+                        null,
+                        null)
+            ).ToList();
+
+            var expected = new List<KeyValuePair<string, string>>()
+            {
+                new KeyValuePair<string, string>("using:TestDummies", typeof(DummyLoggerConfigurationExtensions).GetTypeInfo().Assembly.FullName),
+                new KeyValuePair<string, string>("audit-to:DummyRollingFile.pathFormat", @"C:\toto.log"),
+                new KeyValuePair<string, string>("audit-to:DummyRollingFile.restrictedToMinimumLevel", "Warning")
             };
 
             Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());

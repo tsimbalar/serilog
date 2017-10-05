@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Serilog.Configuration;
 using Serilog.Events;
 
@@ -68,8 +67,9 @@ namespace Serilog.Tests.Settings
                         };
                         continue;
                     case nameof(LoggerConfiguration.WriteTo):
+                    case nameof(LoggerConfiguration.AuditTo):
                         var sinkDirectives = new List<KeyValuePair<string, string>>();
-
+                        var directive = leftSide.Member.Name == nameof(LoggerConfiguration.WriteTo) ? "write-to" : "audit-to";
                         // using 
                         var assembly = methodCall.Method.DeclaringType.GetTypeInfo().Assembly;
                         sinkDirectives.Add(new KeyValuePair<string, string>($"using:{assembly.GetName().Name}", $"{assembly.FullName}"));
@@ -87,7 +87,7 @@ namespace Serilog.Tests.Settings
                             })
                             .Where(x => x.ParamValue != null);
 
-                        var directives = args.Select(x => new KeyValuePair<string, string>($"write-to:{methodName}.{x.ParamName}", x.ParamValue));
+                        var directives = args.Select(x => new KeyValuePair<string, string>($"{directive}:{methodName}.{x.ParamName}", x.ParamValue));
                         sinkDirectives.AddRange(directives);
 
                         yield return sinkDirectives;
