@@ -26,10 +26,10 @@ namespace Serilog.Tests.Settings
             while (current is MethodCallExpression)
             {
                 var methodCall = (MethodCallExpression)current;
-                MemberExpression leftSide;
-                IReadOnlyList<Expression> methodArguments;
                 var method = methodCall.Method;
                 var methodName = method.Name;
+                MemberExpression leftSide;
+                IReadOnlyList<Expression> methodArguments;
                 if (method.IsStatic)
                 {
                     // extension method
