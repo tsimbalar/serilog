@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Serilog.Events;
+using TestDummies;
 using Xunit;
+using System.Reflection;
 
 namespace Serilog.Tests.Settings
 {
@@ -50,6 +53,28 @@ namespace Serilog.Tests.Settings
                 new KeyValuePair<string, string>("enrich:with-property:Prop2", "42"),
                 new KeyValuePair<string, string>("enrich:with-property:Prop3", "https://www.perdu.com/bar"),
                 new KeyValuePair<string, string>("enrich:with-property:Prop4", "True"),
+            };
+
+            Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
+        }
+
+        [Fact]
+        public void SupportSink()
+        {
+            var actual = AppSettingsConverter.From(lc =>
+                    lc
+                    .WriteTo.DummyRollingFile(
+                                @"C:\toto.log",
+                                LogEventLevel.Warning,
+                                null,
+                                null)
+            ).ToList();
+
+            var expected = new List<KeyValuePair<string, string>>()
+            {
+                new KeyValuePair<string, string>("using:TestDummies", typeof(DummyLoggerConfigurationExtensions).GetTypeInfo().Assembly.FullName),
+                new KeyValuePair<string, string>("write-to:DummyRollingFile.pathFormat", @"C:\toto.log"),
+                new KeyValuePair<string, string>("write-to:DummyRollingFile.restrictedToMinimumLevel", "Warning")
             };
 
             Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());

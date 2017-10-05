@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using Serilog.Configuration;
 using Serilog.Events;
 
@@ -13,39 +15,82 @@ namespace Serilog.Tests.Settings
     {
         public static IEnumerable<KeyValuePair<string, string>> From(Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
         {
-            return FromRightToLeft(exp).Reverse();
+            return FromRightToLeft(exp).Reverse().SelectMany(x => x);
         }
 
-        private static IEnumerable<KeyValuePair<string, string>> FromRightToLeft(Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
+        static IEnumerable<List<KeyValuePair<string, string>>> FromRightToLeft(Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
         {
             if (exp == null) throw new ArgumentNullException(nameof(exp));
 
-            var current = exp.Body;
+            Expression current = (MethodCallExpression)exp.Body;
 
             while (current is MethodCallExpression)
             {
                 var methodCall = (MethodCallExpression)current;
-                var leftSide = (MemberExpression)((MethodCallExpression)current).Object;
-                current = leftSide.Expression;
+                MemberExpression leftSide;
+                IReadOnlyList<Expression> methodArguments;
+                var method = methodCall.Method;
+                var methodName = method.Name;
+                if (method.IsStatic)
+                {
+                    // extension method
+                    leftSide = (MemberExpression)methodCall.Arguments[0];
+                    methodArguments = methodCall.Arguments.Skip(1).ToList().AsReadOnly();
+                }
+                else
+                {
+                    // regular method
+                    leftSide = (MemberExpression)methodCall.Object;
+                    methodArguments = methodCall.Arguments.ToList().AsReadOnly();
+                }
 
-                if (leftSide.Member.DeclaringType != typeof(LoggerConfiguration)) continue;
+                current = leftSide.Expression;
 
                 switch (leftSide.Member.Name)
                 {
                     case nameof(LoggerConfiguration.MinimumLevel):
-                        if (Enum.TryParse(methodCall.Method.Name, out LogEventLevel minimumLevel))
+                        if (!Enum.TryParse(methodName, out LogEventLevel minimumLevel))
+                            throw new NotImplementedException($"Not supported : MinimumLevel.{methodName}");
+                        yield return new List<KeyValuePair<string, string>>
                         {
-                            yield return new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString());
-                            continue;
-                        }
-                        throw new NotImplementedException($"Not supported : MinimumLevel.{methodCall.Method.Name}");
+                            new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString())
+                        };
+                        continue;
                     case nameof(LoggerConfiguration.Enrich):
-                        if (methodCall.Method.Name != nameof(LoggerEnrichmentConfiguration.WithProperty))
-                            throw new NotImplementedException($"Not supported : Enrich.{methodCall.Method.Name}");
-                        var enrichPropertyName = ((ConstantExpression)methodCall.Arguments[0]).Value.ToString();
-                        var enrichWithArgument = methodCall.Arguments[1];
+                        if (methodName != nameof(LoggerEnrichmentConfiguration.WithProperty))
+                            throw new NotImplementedException($"Not supported : Enrich.{methodName}");
+                        var enrichPropertyName = ((ConstantExpression)methodArguments[0]).Value.ToString();
+                        var enrichWithArgument = methodArguments[1];
                         var enrichmentValue = ExtractStringValue(enrichWithArgument);
-                        yield return new KeyValuePair<string, string>($"enrich:with-property:{enrichPropertyName}", enrichmentValue);
+                        yield return new List<KeyValuePair<string, string>>
+                        {
+                            new KeyValuePair<string, string>($"enrich:with-property:{enrichPropertyName}", enrichmentValue)
+                        };
+                        continue;
+                    case nameof(LoggerConfiguration.WriteTo):
+                        var sinkDirectives = new List<KeyValuePair<string, string>>();
+
+                        // using 
+                        var assembly = methodCall.Method.DeclaringType.GetTypeInfo().Assembly;
+                        sinkDirectives.Add(new KeyValuePair<string, string>($"using:{assembly.GetName().Name}", $"{assembly.FullName}"));
+
+                        var args = methodArguments
+                            .Zip(method.GetParameters().Skip(1), (expression, param) => new
+                            {
+                                MethodArgument = expression,
+                                Parameter = param
+                            })
+                            .Select(x => new
+                            {
+                                ParamName = x.Parameter.Name,
+                                ParamValue = ExtractStringValue(x.MethodArgument)
+                            })
+                            .Where(x => x.ParamValue != null);
+
+                        var directives = args.Select(x => new KeyValuePair<string, string>($"write-to:{methodName}.{x.ParamName}", x.ParamValue));
+                        sinkDirectives.AddRange(directives);
+
+                        yield return sinkDirectives;
                         continue;
                     default:
                         throw new NotSupportedException($"Not supported : LoggerConfiguration.{leftSide.Member.Name}");
@@ -59,6 +104,7 @@ namespace Serilog.Tests.Settings
             switch (exp)
             {
                 case ConstantExpression constantExp:
+                    if (constantExp.Value == null) return null;
                     return $"{constantExp.Value}";
 
                 case UnaryExpression unaryExp:
