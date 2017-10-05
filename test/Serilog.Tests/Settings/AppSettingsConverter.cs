@@ -48,6 +48,17 @@ namespace Serilog.Tests.Settings
                 switch (leftSide.Member.Name)
                 {
                     case nameof(LoggerConfiguration.MinimumLevel):
+                        if (methodName == nameof(LoggerMinimumLevelConfiguration.Override))
+                        {
+                            var overrideNamespace = ((ConstantExpression)methodArguments[0]).Value.ToString();
+                            var overrideLevel = ExtractStringValue(methodArguments[1]);
+
+                            yield return new List<KeyValuePair<string, string>>
+                            {
+                                new KeyValuePair<string, string>($"minimum-level:override:{overrideNamespace}", overrideLevel)
+                            };
+                            continue;
+                        }
                         if (!Enum.TryParse(methodName, out LogEventLevel minimumLevel))
                             throw new NotImplementedException($"Not supported : MinimumLevel.{methodName}");
                         yield return new List<KeyValuePair<string, string>>

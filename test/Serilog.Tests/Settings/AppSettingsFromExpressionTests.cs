@@ -37,6 +37,24 @@ namespace Serilog.Tests.Settings
         }
 
         [Fact]
+        public void SupportMinimumLevelOverrides()
+        {
+            var actual = AppSettingsConverter.From(lc =>
+                lc
+                    .MinimumLevel.Override("Foo", LogEventLevel.Error)
+                    .MinimumLevel.Override("Bar.Qux", LogEventLevel.Warning)
+            ).ToList();
+
+            var expected = new List<KeyValuePair<string, string>>()
+            {
+                new KeyValuePair<string, string>("minimum-level:override:Foo", "Error"),
+                new KeyValuePair<string, string>("minimum-level:override:Bar.Qux", "Warning")
+            };
+
+            Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
+        }
+
+        [Fact]
         public void SupportEnrichWithProperty()
         {
             var actual = AppSettingsConverter.From(lc =>
