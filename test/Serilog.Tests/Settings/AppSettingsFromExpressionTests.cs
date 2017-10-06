@@ -77,6 +77,40 @@ namespace Serilog.Tests.Settings
         }
 
         [Fact]
+        public void SupportEnrichWithExtensionMethod()
+        {
+            var actual = AppSettingsConverter.From(lc =>
+                lc
+                    .Enrich.WithDummyThreadId()
+            ).ToList();
+
+            var expected = new List<KeyValuePair<string, string>>()
+            {
+                new KeyValuePair<string, string>("using:TestDummies", typeof(DummyLoggerConfigurationExtensions).GetTypeInfo().Assembly.FullName),
+                new KeyValuePair<string, string>("enrich:WithDummyThreadId", "")
+            };
+
+            Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
+        }
+
+
+        [Fact]
+        public void SupportEnrichFromLogContext()
+        {
+            var actual = AppSettingsConverter.From(lc =>
+                lc
+                    .Enrich.FromLogContext()
+            ).ToList();
+
+            var expected = new List<KeyValuePair<string, string>>()
+            {
+                new KeyValuePair<string, string>("enrich:FromLogContext", "")
+            };
+
+            Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
+        }
+
+        [Fact]
         public void SupportWriteTo()
         {
             var actual = AppSettingsConverter.From(lc =>

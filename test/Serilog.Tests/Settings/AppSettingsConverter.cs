@@ -12,6 +12,16 @@ namespace Serilog.Tests.Settings
 
     public static class AppSettingsConverter
     {
+        const string UsingDirective = "using";
+        const string LevelSwitchDirective = "level-switch";
+        const string AuditToDirective = "audit-to";
+        const string WriteToDirective = "write-to";
+        const string MinimumLevelDirective = "minimum-level";
+        const string MinimumLevelControlledByDirective = "minimum-level:controlled-by";
+        const string EnrichWithDirective = "enrich";
+        const string EnrichWithPropertyDirective = "enrich:with-property";
+        const string FilterDirective = "filter";
+
         public static IEnumerable<KeyValuePair<string, string>> From(Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
         {
             return FromRightToLeft(exp).Reverse().SelectMany(x => x);
@@ -55,7 +65,7 @@ namespace Serilog.Tests.Settings
 
                             yield return new List<KeyValuePair<string, string>>
                             {
-                                new KeyValuePair<string, string>($"minimum-level:override:{overrideNamespace}", overrideLevel)
+                                new KeyValuePair<string, string>($"{MinimumLevelDirective}:override:{overrideNamespace}", overrideLevel)
                             };
                             continue;
                         }
@@ -63,50 +73,77 @@ namespace Serilog.Tests.Settings
                             throw new NotImplementedException($"Not supported : MinimumLevel.{methodName}");
                         yield return new List<KeyValuePair<string, string>>
                         {
-                            new KeyValuePair<string, string>("minimum-level", minimumLevel.ToString())
+                            new KeyValuePair<string, string>(MinimumLevelDirective, minimumLevel.ToString())
                         };
                         continue;
                     case nameof(LoggerConfiguration.Enrich):
-                        if (methodName != nameof(LoggerEnrichmentConfiguration.WithProperty))
-                            throw new NotImplementedException($"Not supported : Enrich.{methodName}");
-                        var enrichPropertyName = ((ConstantExpression)methodArguments[0]).Value.ToString();
-                        var enrichWithArgument = methodArguments[1];
-                        var enrichmentValue = ExtractStringValue(enrichWithArgument);
-                        yield return new List<KeyValuePair<string, string>>
+                        if (methodName == nameof(LoggerEnrichmentConfiguration.WithProperty))
                         {
-                            new KeyValuePair<string, string>($"enrich:with-property:{enrichPropertyName}", enrichmentValue)
-                        };
-                        continue;
+                            var enrichPropertyName = ((ConstantExpression)methodArguments[0]).Value.ToString();
+                            var enrichWithArgument = methodArguments[1];
+                            var enrichmentValue = ExtractStringValue(enrichWithArgument);
+                            yield return new List<KeyValuePair<string, string>>
+                            {
+                                new KeyValuePair<string, string>($"{EnrichWithPropertyDirective}:{enrichPropertyName}", enrichmentValue)
+                            };
+                            continue;
+                        }
+                        else
+                        {
+                            yield return SerializeMethodInvocation(EnrichWithDirective, methodCall);
+                            continue;
+
+                        }
                     case nameof(LoggerConfiguration.WriteTo):
+                        yield return SerializeMethodInvocation(WriteToDirective, methodCall);
+                        continue;
                     case nameof(LoggerConfiguration.AuditTo):
-                        var sinkDirectives = new List<KeyValuePair<string, string>>();
-                        var directive = leftSide.Member.Name == nameof(LoggerConfiguration.WriteTo) ? "write-to" : "audit-to";
-                        // using 
-                        var assembly = methodCall.Method.DeclaringType.GetTypeInfo().Assembly;
-                        sinkDirectives.Add(new KeyValuePair<string, string>($"using:{assembly.GetName().Name}", $"{assembly.FullName}"));
-
-                        var args = methodArguments
-                            .Zip(method.GetParameters().Skip(1), (expression, param) => new
-                            {
-                                MethodArgument = expression,
-                                Parameter = param
-                            })
-                            .Select(x => new
-                            {
-                                ParamName = x.Parameter.Name,
-                                ParamValue = ExtractStringValue(x.MethodArgument)
-                            })
-                            .Where(x => x.ParamValue != null);
-
-                        var directives = args.Select(x => new KeyValuePair<string, string>($"{directive}:{methodName}.{x.ParamName}", x.ParamValue));
-                        sinkDirectives.AddRange(directives);
-
-                        yield return sinkDirectives;
+                        yield return SerializeMethodInvocation(AuditToDirective, methodCall);
                         continue;
                     default:
                         throw new NotSupportedException($"Not supported : LoggerConfiguration.{leftSide.Member.Name}");
                 }
             }
+        }
+
+        static List<KeyValuePair<string, string>> SerializeMethodInvocation(string directivePrefix, MethodCallExpression methodCall)
+        {
+            // this is probably an extension method
+            var methodArguments = methodCall.Arguments;
+            var method = methodCall.Method;
+            var methodName = method.Name;
+            var enrichDirectives = new List<KeyValuePair<string, string>>();
+            // using 
+            var enrichAssembly = method.DeclaringType.GetTypeInfo().Assembly;
+            var assemblyShortName = enrichAssembly.GetName().Name;
+            if (assemblyShortName != "Serilog")
+            {
+                enrichDirectives.Add(new KeyValuePair<string, string>($"{UsingDirective}:{assemblyShortName}", $"{enrichAssembly.FullName}"));
+            }
+            var enrichArgs = methodArguments
+                .Zip(method.GetParameters(), (expression, param) => new
+                {
+                    MethodArgument = expression,
+                    Parameter = param
+                })
+                .Skip(1) // it's an extension method, the first item is the target
+                .Select(x => new
+                {
+                    ParamName = x.Parameter.Name,
+                    ParamValue = ExtractStringValue(x.MethodArgument)
+                })
+                .Where(x => x.ParamValue != null);
+
+            var directives2 = enrichArgs.Select(x => new KeyValuePair<string, string>($"{directivePrefix}:{methodName}.{x.ParamName}", x.ParamValue)).ToList();
+            if (directives2.Count > 0)
+            {
+                enrichDirectives.AddRange(directives2);
+            }
+            else
+            {
+                enrichDirectives.Add(new KeyValuePair<string, string>($"{directivePrefix}:{methodName}", ""));
+            }
+            return enrichDirectives;
         }
 
         static string ExtractStringValue(Expression exp)
