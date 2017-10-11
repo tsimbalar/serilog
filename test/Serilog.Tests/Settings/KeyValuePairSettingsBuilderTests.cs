@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using Serilog.Events;
+using Serilog.Settings.KeyValuePairs;
 using Serilog.Tests.Support;
 using Xunit;
 
@@ -39,18 +38,6 @@ namespace Serilog.Tests.Settings
             }.ToList();
 
             Assert.Equal(expected, keyValuePairs.ToList(), new KeyValuePairComparer<string, string>());
-        }
-    }
-
-    public static class KeyValuePairSettingsBuilderExtensions
-    {
-        public static KeyValuePairSettingsBuilder AddExpression(this KeyValuePairSettingsBuilder self,
-            Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
-        {
-            if (self == null) throw new ArgumentNullException(nameof(self));
-            var keyValuePairs = AppSettingsConverter.From(exp);
-
-            return self.AddKeyValuePairs(keyValuePairs);
         }
     }
 }
