@@ -5,6 +5,7 @@ using Serilog.Events;
 using TestDummies;
 using Xunit;
 using System.Reflection;
+using Serilog.Tests.Support;
 
 namespace Serilog.Tests.Settings
 {
@@ -153,19 +154,6 @@ namespace Serilog.Tests.Settings
             };
 
             Assert.Equal(expected.ToList(), actual, new KeyValuePairComparer<string, string>());
-        }
-
-        public class KeyValuePairComparer<TK, TValue> : IEqualityComparer<KeyValuePair<TK, TValue>>
-        {
-            public bool Equals(KeyValuePair<TK, TValue> x, KeyValuePair<TK, TValue> y)
-            {
-                return x.Key.Equals(y.Key) && x.Value.Equals(y.Value);
-            }
-
-            public int GetHashCode(KeyValuePair<TK, TValue> obj)
-            {
-                return obj.GetHashCode();
-            }
         }
     }
 }
