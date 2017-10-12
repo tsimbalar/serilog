@@ -6,10 +6,8 @@ using System.Reflection;
 using Serilog.Configuration;
 using Serilog.Events;
 
-namespace Serilog.Tests.Settings
+namespace Serilog.Tests.Settings.Combined
 {
-
-
     public static class AppSettingsConverter
     {
         const string UsingDirective = "using";

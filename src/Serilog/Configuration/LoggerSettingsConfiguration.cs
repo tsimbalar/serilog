@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using Serilog.Settings.KeyValuePairs;
+using Serilog.Settings.KeyValuePairs.Combined;
 
 namespace Serilog.Configuration
 {
@@ -53,6 +54,26 @@ namespace Serilog.Configuration
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             return Settings(new KeyValuePairSettings(settings));
+        }
+
+        /// <summary>
+        /// Apply settings specified from multiple source and combine them keeping the last defined value for each key.
+        /// </summary>
+        /// <param name="buildFunc">a callback that allows to add Sources of settings to the configuration</param>
+        /// <returns>Configuration object allowing method chaining.</returns>
+        public LoggerConfiguration Combined(Func<ICombinedSettingsOptions, ICombinedSettingsOptions> buildFunc)
+        {
+            if (buildFunc == null) throw new ArgumentNullException(nameof(buildFunc));
+
+            var builder = new KeyValuePairSettingsBuilder();
+            var updatedBuilder = buildFunc(builder);
+            if (!ReferenceEquals(builder, updatedBuilder))
+            {
+                throw new InvalidOperationException($"The {nameof(buildFunc)} passed to `ReadFrom.{nameof(Combined)}()` did not return the original ICombinedSettingsOptions object.");
+            }
+
+            var keyValuePairs = builder.Build();
+            return KeyValuePairs(keyValuePairs);
         }
     }
 }

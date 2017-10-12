@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Linq.Expressions;
-using Serilog.Settings.KeyValuePairs;
+using Serilog.Settings.KeyValuePairs.Combined;
 
-namespace Serilog.Tests.Settings
+namespace Serilog.Tests.Settings.Combined
 {
     public static class KeyValuePairSettingsBuilderExtensions
     {
-        public static KeyValuePairSettingsBuilder AddExpression(this KeyValuePairSettingsBuilder self,
+        public static ICombinedSettingsOptions AddExpression(this ICombinedSettingsOptions self,
             Expression<Func<LoggerConfiguration, LoggerConfiguration>> exp)
         {
             if (self == null) throw new ArgumentNullException(nameof(self));

@@ -16,12 +16,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Serilog.Settings.KeyValuePairs
+namespace Serilog.Settings.KeyValuePairs.Combined
 {
     /// <summary>
     /// Allows the combination of several sources of settings to configure a Logger instance
     /// </summary>
-    public class KeyValuePairSettingsBuilder
+    class KeyValuePairSettingsBuilder : ICombinedSettingsOptions
     {
         readonly List<KeyValuePair<string, string>> _keyValuePairs = new List<KeyValuePair<string, string>>();
 
@@ -31,13 +31,7 @@ namespace Serilog.Settings.KeyValuePairs
             _keyValuePairs.Add(pair);
         }
 
-        /// <summary>
-        /// Adds a key value pair after the existing ones
-        /// </summary>
-        /// <param name="key">the key for the setting</param>
-        /// <param name="value">the value for the setting</param>
-        /// <returns>the same <see cref="KeyValuePairSettingsBuilder"/> to allow method-chaining</returns>
-        public KeyValuePairSettingsBuilder AddKeyValuePair(string key, string value)
+        public ICombinedSettingsOptions AddKeyValuePair(string key, string value)
         {
             if (key == null) throw new ArgumentNullException(nameof(key));
             _keyValuePairs.Add(new KeyValuePair<string, string>(key, value));
@@ -45,12 +39,7 @@ namespace Serilog.Settings.KeyValuePairs
             return this;
         }
 
-        /// <summary>
-        /// Adds several key-value pairs after the existing ones
-        /// </summary>
-        /// <param name="keyValuePairs">a collection of key-value pairs to add</param>
-        /// <returns>the same <see cref="KeyValuePairSettingsBuilder"/> to allow method-chaining</returns>
-        public KeyValuePairSettingsBuilder AddKeyValuePairs(IEnumerable<KeyValuePair<string, string>> keyValuePairs)
+        public ICombinedSettingsOptions AddKeyValuePairs(IEnumerable<KeyValuePair<string, string>> keyValuePairs)
         {
             if (keyValuePairs == null) throw new ArgumentNullException(nameof(keyValuePairs));
 
@@ -65,7 +54,7 @@ namespace Serilog.Settings.KeyValuePairs
         /// Extracts the result of combining all the sources of settings
         /// </summary>
         /// <returns>A list of unique key value pairs</returns>
-        public IEnumerable<KeyValuePair<string, string>> Build()
+        internal IEnumerable<KeyValuePair<string, string>> Build()
         {
             var uniques = new Dictionary<string, string>();
             foreach (var keyValuePair in _keyValuePairs)

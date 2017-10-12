@@ -1,18 +1,18 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Serilog.Events;
-using Serilog.Settings.KeyValuePairs;
+using Serilog.Settings.KeyValuePairs.Combined;
 using Serilog.Tests.Support;
 using Xunit;
 
-namespace Serilog.Tests.Settings
+namespace Serilog.Tests.Settings.Combined
 {
     public class KeyValuePairSettingsBuilderTests
     {
         [Fact]
         public void BuilderCombinesDifferentSources()
         {
-            var keyValuePairs = new KeyValuePairSettingsBuilder()
+            var builder = new KeyValuePairSettingsBuilder()
                 .AddExpression(lc => lc
                         .MinimumLevel.Fatal()
                         .MinimumLevel.Override("System", LogEventLevel.Error)
@@ -25,8 +25,8 @@ namespace Serilog.Tests.Settings
                 })
                 .AddKeyValuePair("minimum-level", "Information")
                 .AddKeyValuePair("enrich:with-property:Enriched3", "Enrichement3")
-                .Build()
                 ;
+            var keyValuePairs = ((KeyValuePairSettingsBuilder)builder).Build();
 
             var expected = new Dictionary<string, string>()
             {

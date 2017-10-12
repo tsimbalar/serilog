@@ -7,7 +7,7 @@ using Xunit;
 using System.Reflection;
 using Serilog.Tests.Support;
 
-namespace Serilog.Tests.Settings
+namespace Serilog.Tests.Settings.Combined
 {
     public class AppSettingsFromExpressionTests
     {
